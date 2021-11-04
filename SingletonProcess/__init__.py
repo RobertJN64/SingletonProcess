@@ -35,6 +35,8 @@ def cleanupDeadProcesses(poolgroup='default', verbose=False):
             item = activepools[poolgroup].pop(i)
             if verbose:
                 print("Removing terminated process with pid: <" + str(item.pid) + ">")
+            if not item.result.successful():
+                item.result.get() #This throws error back in main process
 
 def block(pid = None, poolgroup = 'default', delay = 0.1, verbose=False):
     """Waits for all processes matching pid in poolgroup to exit, if pid is None, waits for all"""

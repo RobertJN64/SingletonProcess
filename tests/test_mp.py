@@ -101,3 +101,12 @@ def test_error():
     with pytest.raises(Exception):
         a = loop(5, 10)
         a.get()
+
+@SingletonProcess
+def mp_error():
+    raise Exception("Help this is an intentional error!")
+
+def test_mp_error():
+    with pytest.raises(Exception):
+        mp_error()
+        project.block()
