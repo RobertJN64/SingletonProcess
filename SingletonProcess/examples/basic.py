@@ -21,3 +21,9 @@ if __name__ == "__main__":
     printListMP(['u', 'v', 'w'], pid='a')
     printListMP(['x', 'y', 'z'], pid='b')
     block()
+
+    print("\nOverrides: ")
+    printListMP(range(0, 10))
+    sleep(1)
+    printListMP(['a', 'b', 'c'])
+    block()
