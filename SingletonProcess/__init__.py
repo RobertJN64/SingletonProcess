@@ -104,15 +104,14 @@ class SingletonProcess:
             return None
 
     def subwrapper(self, allargs):
-        class writer:
-            def __init__(self, error=False):
-                self.error = error
-            def write(self, data):
-                allargs[2].put((self.error, data))
-
         import sys
-        sys.stdout = writer(False)
-        sys.stderr = writer(True)
+        def swrite(data):
+            allargs[2].put((False, data))
+        def ewrite(data):
+            allargs[2].put((True, data))
+
+        setattr(sys.stdout, 'write', swrite)
+        setattr(sys.stderr, 'write', ewrite)
         return self.func(*allargs[0], **allargs[1])
 
     def __call__(self, *args, **kwargs):
