@@ -1,6 +1,7 @@
 import pathos.multiprocessing as multiprocessing
 from typing import List, Dict
 from multiprocessing.pool import MapResult
+from multiprocessing import Queue
 import dataclasses
 from time import sleep
 
@@ -10,6 +11,7 @@ class PIDPool:
     pid: str
     pool: multiprocessing.ProcessPool
     result: MapResult
+    queue: Queue
 
 class ReturnObject:
     """Wrapper for MapResult to pull value from list"""
@@ -38,12 +40,27 @@ def cleanupDeadProcesses(poolgroup='default', verbose=False):
             if not item.result.successful():
                 item.result.get() #This throws error back in main process
 
+            while not item.queue.empty():
+                import sys
+                i = item.queue.get()
+                if not i[0]:
+                    sys.stdout.write(i[1])
+                else:
+                    sys.stderr.write(i[1])
+
 def block(pid = None, poolgroup = 'default', delay = 0.1, verbose=False):
     """Waits for all processes matching pid in poolgroup to exit, if pid is None, waits for all"""
     while True:
         sleep(delay)
         cleanupDeadProcesses(poolgroup, verbose)
         for item in activepools[poolgroup]:
+            while not item.queue.empty():
+                import sys
+                i = item.queue.get()
+                if not i[0]:
+                    sys.stdout.write(i[1])
+                else:
+                    sys.stderr.write(i[1])
             if item.pid == pid or pid is None:
                 break
         else:
@@ -87,6 +104,15 @@ class SingletonProcess:
             return None
 
     def subwrapper(self, allargs):
+        class writer:
+            def __init__(self, error=False):
+                self.error = error
+            def write(self, data):
+                allargs[2].put((self.error, data))
+
+        import sys
+        sys.stdout = writer(False)
+        sys.stderr = writer(True)
         return self.func(*allargs[0], **allargs[1])
 
     def __call__(self, *args, **kwargs):
@@ -99,9 +125,10 @@ class SingletonProcess:
         terminateProcessesByPID(pid, self.poolgroup, self.verbose)
 
         idcounter += 1
+        queue = Queue()
         pool = multiprocessing.ProcessPool(id=idcounter)
-        result = pool.amap(self.subwrapper, [(args, kwargs)])
-        activepools[self.poolgroup].append(PIDPool(pid, pool, result))
+        result = pool.amap(self.subwrapper, [(args, kwargs, queue)])
+        activepools[self.poolgroup].append(PIDPool(pid, pool, result, queue))
         return ReturnObject(result)
 
 class VBSingletonProcess(SingletonProcess):
@@ -111,10 +138,5 @@ class VBSingletonProcess(SingletonProcess):
 class ThreadSafeSingletonProcess(SingletonProcess):
     def __init__(self, func):
         import multiprocessing as mp
-        mp.set_start_method("spawn")
+        mp.set_start_method("spawn", force=True)
         super().__init__(func)
-
-    def subwrapper(self, allargs):
-        import sys
-        sys.stdout = open('stdout.txt', 'a')
-        return self.func(*allargs[0], **allargs[1])
