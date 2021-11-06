@@ -1,7 +1,6 @@
 import pathos.multiprocessing as multiprocessing
 from typing import List, Dict
-from multiprocessing.pool import MapResult
-from multiprocessing import Queue
+import multiprocessing as mp
 import dataclasses
 from time import sleep
 
@@ -10,12 +9,12 @@ class PIDPool:
     """Used for tracking all active processes"""
     pid: str
     pool: multiprocessing.ProcessPool
-    result: MapResult
-    queue: Queue
+    result: mp.pool.MapResult
+    queue: mp.Queue
 
 class ReturnObject:
     """Wrapper for MapResult to pull value from list"""
-    def __init__(self, mapResult: MapResult):
+    def __init__(self, mapResult: mp.pool.MapResult):
         self.raw = mapResult
 
     def get(self, timeout = None, waitforready=False):
@@ -125,7 +124,7 @@ class SingletonProcess:
         terminateProcessesByPID(pid, self.poolgroup, self.verbose)
 
         idcounter += 1
-        queue = Queue()
+        queue = mp.Manager().Queue()
         pool = multiprocessing.ProcessPool(id=idcounter)
         result = pool.amap(self.subwrapper, [(args, kwargs, queue)])
         activepools[self.poolgroup].append(PIDPool(pid, pool, result, queue))
@@ -137,6 +136,5 @@ class VBSingletonProcess(SingletonProcess):
 
 class ThreadSafeSingletonProcess(SingletonProcess):
     def __init__(self, func):
-        import multiprocessing as mp
         mp.set_start_method("spawn", force=True)
         super().__init__(func)
