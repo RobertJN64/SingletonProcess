@@ -5,7 +5,6 @@ import multiprocessing as mp
 from multiprocessing.pool import MapResult
 import dataclasses
 from time import sleep
-import os
 
 @dataclasses.dataclass
 class PIDPool:
@@ -14,7 +13,6 @@ class PIDPool:
     pool: multiprocessing.ProcessPool
     result: MapResult
     queue: mp.Queue
-    ospid: int
 
 class ReturnObject:
     """Wrapper for MapResult to pull value from list"""
@@ -88,11 +86,6 @@ def terminateProcessesByPID(pid, poolgroup='default', verbose=False):
             handleStdoutRedirect(item.queue)
             item.pool.terminate()
             item.pool.join()
-            sleep(1)
-            try:
-                os.kill(item.ospid, 9)
-            except ProcessLookupError:
-                pass #already dead
             activepools[poolgroup].pop(i)
 
 class SingletonProcess:
@@ -122,7 +115,6 @@ class SingletonProcess:
 
         setattr(sys.stdout, 'write', swrite)
         setattr(sys.stderr, 'write', ewrite)
-        allargs[2].put(os.getpid())
         return self.func(*allargs[0], **allargs[1])
 
     def __call__(self, *args, **kwargs):
@@ -138,7 +130,7 @@ class SingletonProcess:
         queue = pathos_mp.Manager().Queue()
         pool = multiprocessing.ProcessPool(id=idcounter)
         result = pool.amap(self.subwrapper, [(args, kwargs, queue)])
-        activepools[self.poolgroup].append(PIDPool(pid, pool, result, queue, queue.get()))
+        activepools[self.poolgroup].append(PIDPool(pid, pool, result, queue))
         return ReturnObject(result)
 
 class VBSingletonProcess(SingletonProcess):
