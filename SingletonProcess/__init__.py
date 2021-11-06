@@ -80,9 +80,9 @@ def terminateProcessesByPID(pid, poolgroup='default', verbose=False):
                 else:
                     reason = "pid matched with terminate request."
                 print("Terminating process with pid: <" + str(item.pid) + "> because", reason)
+            handleStdoutRedirect(item.queue)
             item.pool.terminate()
             item.pool.join()
-            handleStdoutRedirect(item.queue)
             activepools[poolgroup].pop(i)
 
 class SingletonProcess:
