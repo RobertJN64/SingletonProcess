@@ -87,9 +87,12 @@ def terminateProcessesByPID(pid, poolgroup='default', verbose=False):
                 print("Terminating process with pid: <" + str(item.pid) + "> because", reason)
             handleStdoutRedirect(item.queue)
             item.pool.terminate()
-            sleep(1)
-            os.kill(item.ospid, 9)
             item.pool.join()
+            sleep(1)
+            try:
+                os.kill(item.ospid, 9)
+            except ProcessLookupError:
+                pass #already dead
             activepools[poolgroup].pop(i)
 
 class SingletonProcess:
