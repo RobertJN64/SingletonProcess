@@ -80,7 +80,10 @@ def terminateProcessesByPID(pid, poolgroup='default', verbose=False):
                 else:
                     reason = "pid matched with terminate request."
                 print("Terminating process with pid: <" + str(item.pid) + "> because", reason)
-            handleStdoutRedirect(item.queue)
+            try:
+                handleStdoutRedirect(item.queue)
+            except BrokenPipeError:
+                pass #shutdown can be violent!
             item.pool.terminate()
             item.pool.join()
             activepools[poolgroup].pop(i)
