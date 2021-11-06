@@ -11,5 +11,5 @@ def complicatedOperation(l: list):
 
 if __name__ == "__main__":
     ret = complicatedOperation(['u', 'v', 'w'])
-    #block()
+    block()
     print(ret.get())

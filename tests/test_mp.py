@@ -1,5 +1,6 @@
 import SingletonProcess as project
 from SingletonProcess import VBSingletonProcess, SingletonProcess
+from SingletonProcess import VBThreadSafeSingletonProcess, ThreadSafeSingletonProcess
 from time import sleep, time
 import pytest
 
@@ -110,3 +111,17 @@ def test_mp_error():
     with pytest.raises(Exception):
         mp_error()
         project.block()
+
+@ThreadSafeSingletonProcess
+def print_x():
+    print("x")
+
+@VBThreadSafeSingletonProcess
+def print_y():
+    print("y")
+
+def test_threadsafe(capture_stdout):
+    print_x()
+    project.block()
+    assert capture_stdout['stdout'] == 'x\n'
+    print_y()

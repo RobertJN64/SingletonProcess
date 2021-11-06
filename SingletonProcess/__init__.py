@@ -1,6 +1,8 @@
 import pathos.multiprocessing as multiprocessing
+from pathos.helpers import mp as pathos_mp
 from typing import List, Dict
 import multiprocessing as mp
+from multiprocessing.pool import MapResult
 import dataclasses
 from time import sleep
 
@@ -9,12 +11,12 @@ class PIDPool:
     """Used for tracking all active processes"""
     pid: str
     pool: multiprocessing.ProcessPool
-    result: mp.pool.MapResult
+    result: MapResult
     queue: mp.Queue
 
 class ReturnObject:
     """Wrapper for MapResult to pull value from list"""
-    def __init__(self, mapResult: mp.pool.MapResult):
+    def __init__(self, mapResult: MapResult):
         self.raw = mapResult
 
     def get(self, timeout = None, waitforready=False):
@@ -24,6 +26,15 @@ class ReturnObject:
 
 activepools: Dict[str, List[PIDPool]] = {'default': []}
 idcounter = 0
+
+def handleStdoutRedirect(queue):
+    while not queue.empty():
+        import sys
+        i = queue.get()
+        if not i[0]:
+            sys.stdout.write(i[1])
+        else:
+            sys.stderr.write(i[1])
 
 def cleanupDeadProcesses(poolgroup='default', verbose=False):
     """
@@ -38,14 +49,9 @@ def cleanupDeadProcesses(poolgroup='default', verbose=False):
                 print("Removing terminated process with pid: <" + str(item.pid) + ">")
             if not item.result.successful():
                 item.result.get() #This throws error back in main process
+            handleStdoutRedirect(item.queue)
 
-            while not item.queue.empty():
-                import sys
-                i = item.queue.get()
-                if not i[0]:
-                    sys.stdout.write(i[1])
-                else:
-                    sys.stderr.write(i[1])
+
 
 def block(pid = None, poolgroup = 'default', delay = 0.1, verbose=False):
     """Waits for all processes matching pid in poolgroup to exit, if pid is None, waits for all"""
@@ -53,13 +59,7 @@ def block(pid = None, poolgroup = 'default', delay = 0.1, verbose=False):
         sleep(delay)
         cleanupDeadProcesses(poolgroup, verbose)
         for item in activepools[poolgroup]:
-            while not item.queue.empty():
-                import sys
-                i = item.queue.get()
-                if not i[0]:
-                    sys.stdout.write(i[1])
-                else:
-                    sys.stderr.write(i[1])
+            handleStdoutRedirect(item.queue)
             if item.pid == pid or pid is None:
                 break
         else:
@@ -82,6 +82,7 @@ def terminateProcessesByPID(pid, poolgroup='default', verbose=False):
                 print("Terminating process with pid: <" + str(item.pid) + "> because", reason)
             item.pool.terminate()
             item.pool.join()
+            handleStdoutRedirect(item.queue)
             activepools[poolgroup].pop(i)
 
 class SingletonProcess:
@@ -124,7 +125,7 @@ class SingletonProcess:
         terminateProcessesByPID(pid, self.poolgroup, self.verbose)
 
         idcounter += 1
-        queue = mp.Manager().Queue()
+        queue = pathos_mp.Manager().Queue()
         pool = multiprocessing.ProcessPool(id=idcounter)
         result = pool.amap(self.subwrapper, [(args, kwargs, queue)])
         activepools[self.poolgroup].append(PIDPool(pid, pool, result, queue))
@@ -135,6 +136,11 @@ class VBSingletonProcess(SingletonProcess):
     verbose = True
 
 class ThreadSafeSingletonProcess(SingletonProcess):
+    """Forces use of spawn on linux instead of fork"""
     def __init__(self, func):
         mp.set_start_method("spawn", force=True)
         super().__init__(func)
+
+class VBThreadSafeSingletonProcess(ThreadSafeSingletonProcess):
+    """Verbose alternative to ThreadSafeSingletonProcess, functionally identical"""
+    verbose = True
