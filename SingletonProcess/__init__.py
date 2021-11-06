@@ -28,13 +28,16 @@ activepools: Dict[str, List[PIDPool]] = {'default': []}
 idcounter = 0
 
 def handleStdoutRedirect(queue):
-    while not queue.empty():
-        import sys
-        i = queue.get()
-        if not i[0]:
-            sys.stdout.write(i[1])
-        else:
-            sys.stderr.write(i[1])
+    try:
+        while not queue.empty():
+            import sys
+            i = queue.get()
+            if not i[0]:
+                sys.stdout.write(i[1])
+            else:
+                sys.stderr.write(i[1])
+    except BrokenPipeError:
+        pass #don't really know how to fix this... mostly happens during shutdowns so its probably fine
 
 def cleanupDeadProcesses(poolgroup='default', verbose=False):
     """
@@ -80,10 +83,7 @@ def terminateProcessesByPID(pid, poolgroup='default', verbose=False):
                 else:
                     reason = "pid matched with terminate request."
                 print("Terminating process with pid: <" + str(item.pid) + "> because", reason)
-            try:
-                handleStdoutRedirect(item.queue)
-            except BrokenPipeError:
-                pass #shutdown can be violent!
+            handleStdoutRedirect(item.queue)
             item.pool.terminate()
             item.pool.join()
             activepools[poolgroup].pop(i)
