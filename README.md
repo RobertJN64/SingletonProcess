@@ -133,3 +133,7 @@ if __name__ == '__main__':
     startServer(hostname='https://examplea.com') #stops first server
     block()
 ```
+
+## ThreadSafeSingletonProcess
+
+Uses spawn instead of fork on linux, which may work better for projects that also use threads.

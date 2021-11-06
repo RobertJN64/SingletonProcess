@@ -86,11 +86,12 @@ class SingletonProcess:
         else:
             return None
 
+    def subwrapper(self, allargs):
+        return self.func(*allargs[0], **allargs[1])
+
     def __call__(self, *args, **kwargs):
         """Calls the function with given args, and terminates existing processes with matching ids"""
         global idcounter
-        def subwrapper(allargs):
-            return self.func(*allargs[0], **allargs[1])
 
         pid = self.getPID(args, kwargs)
         if self.verbose:
@@ -99,10 +100,21 @@ class SingletonProcess:
 
         idcounter += 1
         pool = multiprocessing.ProcessPool(id=idcounter)
-        result = pool.amap(subwrapper, [(args, kwargs)])
+        result = pool.amap(self.subwrapper, [(args, kwargs)])
         activepools[self.poolgroup].append(PIDPool(pid, pool, result))
         return ReturnObject(result)
 
 class VBSingletonProcess(SingletonProcess):
     """Verbose alternative to SingletonProcess, functionally identical"""
     verbose = True
+
+class ThreadSafeSingletonProcess(SingletonProcess):
+    def __init__(self, func):
+        import multiprocessing as mp
+        mp.set_start_method("spawn")
+        super().__init__(func)
+
+    def subwrapper(self, allargs):
+        import sys
+        sys.stdout = open('stdout.txt', 'a')
+        return self.func(*allargs[0], **allargs[1])
